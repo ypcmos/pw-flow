@@ -1,0 +1,43 @@
+LOVE_YP_POWERFLOW_DATA
+#bus.txt
+BUS_INFO_BEGIN:5
+#i	Name	Type	V	cita	BS	GP	GQ	LP	LQ	Qmax	Qmin	b
+1	bus_1	3 	1	0	1	0	0 	1.6	0.8	0	0	0
+2	bus_2	3	1.01	0	1	0	0	2	1	0	0	0
+3	bus_3	3	1	0	1	0	0	3.7	1.3	0	0	0
+4	bus_4	2	1.05	0	1	5	0	0	0	0	0	0		
+5	bus_5	1	1.05	0	1	0	0	0	0	0	0	0
+#i:    节点编号
+#Name：名称
+#Type：节点类型    1=平衡  2:PV  3:PQ
+#V：   电压幅值(p.u.)
+#cita：电压角度(°)
+#BS:	基准功率(MVA)
+#GP：  发电机P(MW)
+#GQ：  发电机Q(Mvar)
+#LP：  负荷P(MW)
+#LQ：  负荷Q(Mvar)
+	#Qmax:	无功极限(Mvar)
+#Qmin:	无功极限(Mvar)
+#b:	电纳(p.u.)
+BUS_INFO_END
+
+#branch(支路信息)
+BRANCH_INFO_BEGIN:5
+#i 	j	Name	Type	R	X	B	K
+1	2	L1	1	0.04	0.25	0.25	0
+1	3	L2	1	0.1	0.35	0	0
+2	3	L3	1	0.08	0.3	0.25	0
+4	2	T1	2	0	0.015	0	1.05
+5	3	T2	2	0.0	0.03	0	1.05
+
+#i:    支路的始端节点编号                          
+#j:    支路的末端节点编号 
+#Name：支路名称
+#Type：类型， 2=变压器  1=线路
+#R：   电阻(p.u.)
+#X：   电抗
+#B：   线路总电纳（pai型等值电路）
+#K：   变压器非标准变比
+
+BRANCH_INFO_END

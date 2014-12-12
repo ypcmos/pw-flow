@@ -121,7 +121,7 @@ namespace PowerSystem
 		FastPowerFlow();
 		virtual ~FastPowerFlow();
 		virtual void CreateYMatrix();	
-		virtual void FlowCal(int type = 0, int times = 10, double e = 1.0e-4);
+		virtual void FlowCal(int type = 0, int times = 10, double e = 1.0e-5);
 		virtual void CreateB1_XB();
 		virtual void CreateB2_XB();
 		virtual void CreateB1_BX();
@@ -166,4 +166,8 @@ namespace PowerSystem
 		vector<int> JacobiDis;
 	
 	};
+	void test_Print(const vector<int>& v);
+	void test_Print(const vector<double>& v);
+	void test_Print(const vector<Pair>& v);
+	void test_Print(const vector<ThreeElements<double>>& v);
 };

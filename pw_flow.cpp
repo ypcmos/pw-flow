@@ -69,14 +69,29 @@ namespace PowerSystem
 					if (text.length() == 0 || text[0] == '#')
 					{
 						continue;
-					}else{
+					} else {
 						string sp[] = {"\t"};
 						StrArray split = ExString::Splite(text, StrArray(sp, sp + 1));
 						if (split.size() != 8)
 						{
 							throw _Exception("Branch data in the file is not correct(In FromConfigFile)");
 						}
-						branch.push_back(Branch(atoi(split[0].c_str()), atoi(split[1].c_str()), split[2], (Branch::BranchType)atoi(split[3].c_str()), atof(split[4].c_str()), atof(split[5].c_str()), atof(split[6].c_str()), atof(split[7].c_str())));
+						int size = branch.size();
+						Branch tbra(atoi(split[0].c_str()), atoi(split[1].c_str()), split[2], (Branch::BranchType)atoi(split[3].c_str()), atof(split[4].c_str()), atof(split[5].c_str()), atof(split[6].c_str()), atof(split[7].c_str()));
+						if (size > 0) 
+						{
+							Branch *t = &branch[size - 1];
+							if (t->i == tbra.i && t->j == tbra.j) 
+							{
+								complex<double> z1(t->R, t->X), z2(tbra.R, tbra.X), z;
+								z = z1 * z2 / (z1 + z2);
+								t->R = z.real();
+								t->X = z.imag();
+								t->B += tbra.B;
+								continue;
+							}
+						}
+						branch.push_back(tbra);	
 					}
 				}
 			}
@@ -849,6 +864,14 @@ namespace PowerSystem
 		}
 
 		B1.FromTEs(_B1, _B1.size() + add, nPQ + nPV);
+
+		
+
+		for (vector<int>::const_iterator it = B1Map.begin(); it != B1Map.end(); it++)
+		{
+			cout << *it << ",";
+		}
+		cout << endl;
 	}
 
 	void FastPowerFlow::CreateB2_PQ()
@@ -916,17 +939,28 @@ namespace PowerSystem
 		}
 
 		B2.FromTEs(_B2, _B2.size() + add, nPQ);
-		B2.FromTEs(_B2, _B2.size() + add, nPQ);
+		
+		for (vector<int>::const_iterator it = B2Map.begin(); it != B2Map.end(); it++)
+		{
+			cout << *it << ",";
+		}
+		cout << endl;
 	}
 
 	void FastPowerFlow::GetB1FactorTable()
 	{
 		B1.LDUDecomposition(false);
+		Matrix<double> m;
+		B1.ToMatrix(m);
+		m.ToFile("PQ_FACTS1.txt");
 	}
 
 	void FastPowerFlow::GetB2FactorTable()
 	{
 		B2.LDUDecomposition(false);
+		Matrix<double> m;
+		B2.ToMatrix(m);
+		m.ToFile("PQ_FACTS2.txt");
 	}
 
 	void FastPowerFlow::CreateB1()
@@ -970,6 +1004,8 @@ namespace PowerSystem
 
 	void FastPowerFlow::FlowCal(int type, int times, double e)
 	{	
+		bool debug = 0;
+
 		B1.Clear();
 		B2.Clear();
 		B1Map.clear();
@@ -979,12 +1015,16 @@ namespace PowerSystem
 		this->type = (Type)type;	
 		CreateB1();
 		CreateB2();
-		GetB1FactorTable();
-		GetB2FactorTable();
+		if (!debug)
+		{
+			GetB1FactorTable();
+			GetB2FactorTable();
+		}
 		vector<double> dP(nPQ + nPV), P(nPQ + nPV), cita(nPQ + nPV, 0.0), cV(nPV, 0), V(nPQ, 1.0), dQ(nPQ), Q(nPQ), PV(nPQ + nPV);
 		vector<double> sV(GetNodeNum()), sCita(GetNodeNum(), 0.0);
 		sV[0] = BAB.GetBus(GetSystemMap(0))->V;
-		sCita[0] = BAB.GetBus(GetSystemMap(0))->cita;
+		sCita[0] = 0;
+		double standardCita = BAB.GetBus(GetSystemMap(0))->cita / 180 * PI;
 
 		int i = 0;
 		for (vector<int>::const_iterator it = B1Map.begin(); it != B1Map.end(); it++)
@@ -1022,15 +1062,16 @@ namespace PowerSystem
 			for (vector<int>::const_iterator it = B1Map.begin(); it != B1Map.end(); it++)
 			{	
 				int _i = distance<vector<int>::const_iterator>(B1Map.begin(), it);
-				dP[_i] = (P[_i] - GetPi(*it, sV, sCita)) / PV[_i];
+				dP[_i] = (P[_i] - GetPi(*it, sV, sCita));
 				//cout << _i << ':' << P[_i] <<'?' << dP[_i] << 'l' << P[_i] - GetPi(*it, sV, sCita) <<endl;
-
+				//cout << dP[_i] << ",";
 				if (maxPe < fabs(dP[_i]))
 				{
-					maxPe = fabs(dP[_i]);
+					maxPe = fabs(dP[_i]);			
 				}
+				dP[_i] /= PV[_i];
 			}
-			
+			cout << k << "´Î:\r\n" << maxPe << endl;
 			if (maxPe < e)
 			{
 				KP = 0;
@@ -1039,9 +1080,44 @@ namespace PowerSystem
 				{
 					break;
 				}
-			}else{
-				B1.SolveEquation(dP);
-				
+			} else {
+				if (!debug)
+				{
+					B1.SolveEquation(dP);
+					double * mem = new double[dP.size()];
+					for (int i = 0; i < dP.size(); i++)
+					{
+						mem[i] = dP[i];
+					}
+					Matrix<double> bb(mem, dP.size(), 1);
+					bb.ToFile("debug2.txt");
+					delete [] mem;
+				} else {
+					Matrix<double> tb, t;
+					B1.ToMatrix(tb);
+					tb.ToFile("a.txt");
+					double * mem = new double[dP.size()];
+					for (int i = 0; i < dP.size(); i++)
+					{
+						mem[i] = dP[i];
+					}
+					
+					Matrix<double> b(mem, dP.size(), 1);
+					b.ToFile("a.txt");
+					t = tb.Inverse() * b;
+					for (int i = 0; i < dP.size(); i++)
+					{
+						dP[i] = t.At(i, 0);
+					}
+					for (int i = 0; i < dP.size(); i++)
+					{
+						mem[i] = dP[i];
+					}
+					Matrix<double> bb(mem, dP.size(), 1);
+					bb.ToFile("debug1.txt");
+					delete [] mem;
+				}
+		
 				for (vector<double>::iterator it = cita.begin(); it != cita.end(); it++)
 				{
 					int _i = distance(cita.begin(), it);
@@ -1057,15 +1133,16 @@ namespace PowerSystem
 			for (vector<int>::const_iterator it = B2Map.begin(); it != B2Map.end(); it++)
 			{	
 				int _i = distance<vector<int>::const_iterator>(B2Map.begin(), it);
-				dQ[_i] = (Q[_i] - GetQi(*it, sV, sCita)) / V[_i]; 
+				dQ[_i] = (Q[_i] - GetQi(*it, sV, sCita)); 
 				//cout << Q[_i] - GetQi(*it, sV, sCita) << endl;
 
 				if (maxQe < fabs(dQ[_i]))
 				{
-					maxQe = fabs(dQ[_i]);
+					maxQe = fabs(dQ[_i]);				
 				}
+				dQ[_i] /= V[_i];
 			}
-			
+			cout << maxQe << endl;
 			if (maxQe < e)
 			{
 				KQ = 0;
@@ -1075,8 +1152,25 @@ namespace PowerSystem
 					break;
 				}
 			}else{
-				B2.SolveEquation(dQ);
-				
+				if (!debug)
+				{
+					B2.SolveEquation(dQ);
+				} else {
+					Matrix<double> tb, t;
+					B2.ToMatrix(tb);
+					double * mem = new double[dQ.size()];
+					for (int i = 0; i < dQ.size(); i++)
+					{
+						mem[i] = dQ[i];
+					}
+					Matrix<double> b(mem, dQ.size(), 1);
+					t = tb.Inverse() * b;
+					for (int i = 0; i < dQ.size(); i++)
+					{
+						dQ[i] = t.At(i, 0);
+					}
+				}
+
 				for (vector<double>::iterator it = V.begin(); it != V.end(); it++)
 				{
 					int _i = distance(V.begin(), it);
@@ -1099,7 +1193,7 @@ namespace PowerSystem
 			BusAndBranch::Bus *pBu = BAB.GetBus(it->j);
 
 			pBu->V = sV[i];
-			pBu->cita = sCita[i];
+			pBu->cita = sCita[i] + standardCita;
 			pBu->P = GetPi(i, sV, sCita);
 			pBu->Q = GetQi(i, sV, sCita);
 		}
@@ -1396,6 +1490,7 @@ namespace PowerSystem
 			}
 		}
 
+		double standardCita = 0;
 		int k = 0;
 		while (k <= times)
 		{
@@ -1415,7 +1510,8 @@ namespace PowerSystem
 					break;
 				case BusAndBranch::Bus::SLACK:
 					sV[it->i] = pBu->V;
-					sCita[it->i] = pBu->cita;
+					sCita[it->i] = 0;
+					standardCita = pBu->cita / 180 * PI;
 					break;
 				default:
 					break;
@@ -1534,6 +1630,7 @@ namespace PowerSystem
 			int rc = GetDistance(0, nPQ + nPV);
 			SparseMatrix<double>::SortTEs(JacobiMatrix, rc);
 			SparseMatrix<double> sJacobi(JacobiMatrix, JacobiSize, rc);
+
 			sJacobi.LDUDecomposition(false);
 			sJacobi.SolveEquation(dS);
 			i = 0;
@@ -1572,7 +1669,7 @@ namespace PowerSystem
 			BusAndBranch::Bus *pBu = BAB.GetBus(it->j);
 
 			pBu->V = sV[i];
-			pBu->cita = sCita[i];
+			pBu->cita = sCita[i] + standardCita;
 			pBu->P = GetPi(i, sV, sCita);
 			pBu->Q = GetQi(i, sV, sCita);
 		}

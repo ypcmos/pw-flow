@@ -1597,7 +1597,8 @@ namespace PowerSystem
 		}
 		if (0 == layer)
 		{
-			for (int k = 1; k < (int)JA.size(); k++)
+			int size = JA.size();
+			for (int k = 1; k < size; k++)
 			{
 				if (JA[k] == 0)
 				{
@@ -1634,14 +1635,13 @@ namespace PowerSystem
 					VA[k] /= d;
 
 					if (!noInjection)
-					{
-						
+					{					
 						for (; pursuit < j; pursuit++)
 						{
 							if (SumMulLdu(i, pursuit, i - 1, ans))
 							{
 								//Inject by row
-								AddElement(i, pursuit, ans / d);
+								AddElement(i, pursuit, (T(0.0) - ans) / d);
 							}
 						}
 						pursuit = j + 1;
